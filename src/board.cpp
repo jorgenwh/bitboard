@@ -1,5 +1,4 @@
 #include "board.h"
-#include "bitboard.h"
 
 // Constructor initializes to start position
 Board::Board() {
@@ -42,13 +41,13 @@ void Board::init_startpos() {
 }
 
 // Make a move on the board
-bool Board::make_move(const Move& move) {
+bool Board::make_move(const Move &move) {
     Color us = side_to_move;
     Color them = (us == WHITE) ? BLACK : WHITE;
 
     Piece moved_piece = NO_PIECE;
 
-    // Find moving piece clearly
+    // Find moved piece
     for (int p = PAWN; p < PIECE_NB; ++p) {
         if (Bitboards::get_bit(pieces[us][p], move.from)) {
             moved_piece = static_cast<Piece>(p);
@@ -57,34 +56,38 @@ bool Board::make_move(const Move& move) {
         }
     }
 
-    // Handle captures explicitly
-    for (int p = PAWN; p < PIECE_NB; ++p) {
-        if (Bitboards::get_bit(pieces[them][p], move.to)) {
-            Bitboards::clear_bit(pieces[them][p], move.to);
-            break;
+    // Handle en passant captures FIRST clearly:
+    if (moved_piece == PAWN && move.to == en_passant_square) {
+        // Explicitly calculate the captured pawn's square
+        int ep_captured_square = move.to + ((us == WHITE) ? -8 : 8);
+        Bitboards::clear_bit(pieces[them][PAWN], ep_captured_square);
+    } else {
+        // Regular captures explicitly handled
+        for (int p = PAWN; p < PIECE_NB; ++p) {
+            if (Bitboards::get_bit(pieces[them][p], move.to)) {
+                Bitboards::clear_bit(pieces[them][p], move.to);
+                break;
+            }
         }
     }
 
-    // Set moved piece (including promotion clearly)
+    // Set moved piece clearly (handle promotions explicitly too)
     Piece final_piece = move.promotion == NO_PIECE ? moved_piece : move.promotion;
     Bitboards::set_bit(pieces[us][final_piece], move.to);
 
-    // Update castling rights clearly
+    // Clearly update castling rights
     update_castling_rights(move.from);
-    update_castling_rights(move.to); // Also update if a rook was captured
+    update_castling_rights(move.to);
 
-    // Update en passant square
-    en_passant_square = -1;  // Reset
+    // En passant square clearly updated:
     if (moved_piece == PAWN && abs(move.to - move.from) == 16) {
-        en_passant_square = (move.from + move.to) / 2;  // Set EP target
+        en_passant_square = (move.from + move.to) / 2;
     } else {
         en_passant_square = -1;
     }
 
-    // Change side clearly
     side_to_move = them;
-
-    return true; // Move successfully made
+    return true;
 }
 
 // Return occupied squares by a specific color

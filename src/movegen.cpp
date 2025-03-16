@@ -1,6 +1,5 @@
-// movegen.cpp
 #include "movegen.h"
-#include "bitboard.h"
+
 #include <iostream>
 
 namespace MoveGen {
@@ -11,7 +10,37 @@ Bitboard knight_attacks[64];
 // Global lookup table for king moves
 Bitboard king_attacks[64];
 
-std::vector<Move> generate_moves(const Board &board) {
+uint64_t perft(const Board& board, int depth) {
+    if (depth == 0)
+        return 1ULL;
+
+    uint64_t nodes = 0ULL;
+    auto moves = generate_legal_moves(board);
+
+    for (const Move &move : moves) {
+        Board copy_board = board;
+
+        // Clearly make move
+        if (!copy_board.make_move(move))
+            continue; // skip if invalid
+
+        Color us = board.side_to_move; // side before move
+        Color them = (us == WHITE) ? BLACK : WHITE; // side after move
+
+        // Get king's position after move
+        Bitboard king_bb = copy_board.pieces[us][KING];
+        int king_square = Bitboards::lsb(king_bb);
+
+        if (is_square_attacked(copy_board, king_square, them))
+            continue; // skip if move leaves king in check
+
+        nodes += perft(copy_board, depth - 1);
+    }
+
+    return nodes;
+}
+
+std::vector<Move> generate_legal_moves(const Board &board) {
     std::vector<Move> pseudo_legal_moves;
 
     generate_pawn_moves(board, pseudo_legal_moves);
@@ -128,22 +157,27 @@ void generate_pawn_moves(const Board &board, std::vector<Move> &moves) {
         Bitboards::clear_bit(temp, to);
     }
 
-    // --- En passant clearly ---
+    // --- Correct En passant logic clearly ---
     if (board.en_passant_square != -1) {
         Bitboard pawns = board.pieces[us][PAWN];
-        // Bitboard ep_square_bb = (1ULL << board.en_passant_square);
+        Bitboard ep_square_bb = (1ULL << board.en_passant_square);
 
-        // Possible pawns that can capture en passant
-        // Bitboard potential_attackers = (us == WHITE) ?
-        //     ((pawns << 7) & 0x7F7F7F7F7F7F7F7FULL) | ((pawns << 9) & 0xFEFEFEFEFEFEFEFEULL) :
-        //     ((pawns >> 7) & 0xFEFEFEFEFEFEFEFEULL) | ((pawns >> 9) & 0x7F7F7F7F7F7F7F7FULL);
-
-        if (Bitboards::get_bit(pawns, board.en_passant_square + ((us == WHITE) ? -7 : 9))) {
-            moves.push_back({board.en_passant_square - ((us == WHITE) ? 7 : -9), board.en_passant_square, NO_PIECE});
-        }
-
-        if (Bitboards::get_bit(pawns, board.en_passant_square - ((us == WHITE) ? 9 : -7))) {
-            moves.push_back({board.en_passant_square - ((us == WHITE) ? 9 : -7), board.en_passant_square, NO_PIECE});
+        if (us == WHITE) {
+            // White pawns can capture en passant diagonally from behind (rank 5)
+            if ((ep_square_bb >> 7) & pawns & 0xFEFEFEFEFEFEFEFEULL) {
+                moves.push_back({board.en_passant_square - 7, board.en_passant_square, NO_PIECE});
+            }
+            if ((ep_square_bb >> 9) & pawns & 0x7F7F7F7F7F7F7F7FULL) {
+                moves.push_back({board.en_passant_square - 9, board.en_passant_square, NO_PIECE});
+            }
+        } else {
+            // Black pawns capturing en passant (rank 4)
+            if ((ep_square_bb << 7) & pawns & 0x7F7F7F7F7F7F7F7FULL) {
+                moves.push_back({board.en_passant_square + 7, board.en_passant_square, NO_PIECE});
+            }
+            if ((ep_square_bb << 9) & pawns & 0xFEFEFEFEFEFEFEFEULL) {
+                moves.push_back({board.en_passant_square + 9, board.en_passant_square, NO_PIECE});
+            }
         }
     }
 }

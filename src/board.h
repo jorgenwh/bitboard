@@ -1,6 +1,8 @@
 #pragma once
+
 #include "types.h"
-#include "types.h"
+#include "bitboard.h"
+
 #include <array>
 #include <iostream>
 

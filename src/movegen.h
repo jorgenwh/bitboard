@@ -1,10 +1,15 @@
 #pragma once
+
 #include "board.h"
 #include "types.h"
+#include "util.h"
+
 #include <vector>
 
 namespace MoveGen {
-    std::vector<Move> generate_moves(const Board& board);
+    uint64_t perft(const Board& board, int depth);
+
+    std::vector<Move> generate_legal_moves(const Board& board);
 
     // Individual move generators
     void generate_pawn_moves(const Board& board, std::vector<Move>& moves);
